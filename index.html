@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Raiyath Kande</title>
+<style>
+body{margin:0;background:#111;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
+#menu,#gameOver{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(0,0,0,.85);z-index:10}
+button,select{padding:10px;margin:5px}
+canvas{display:block}
+#hud{position:absolute;top:10px;left:10px;font-weight:bold}
+</style>
+</head>
+<body>
+<div id="menu">
+<h1>RAIYATH KANDE</h1>
+<p>Select Character</p>
+<select id="char">
+<option value="1">Character 1 (character1.gif)</option>
+<option value="2">Character 2 (character2.gif)</option>
+</select>
+<select id="difficulty">
+<option value="easy">Easy</option>
+<option value="normal">Normal</option>
+<option value="hard">Hard</option>
+</select>
+<button onclick="startGame()">Start Game</button>
+</div>
+
+<div id="gameOver" style="display:none">
+<h1>Game Over</h1>
+<div id="finalScore"></div>
+<button onclick="restart()">Restart</button>
+</div>
+
+<div id="hud">Score: <span id="score">0</span> | Donuts: <span id="donuts">0</span></div>
+<canvas id="game"></canvas>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
+resize();addEventListener("resize",resize);
+
+let bird,obstacles,coins,score,donuts,gameRunning=false,speed=3,gap=180;
+
+function startGame(){
+ const d=document.getElementById("difficulty").value;
+ if(d==="easy"){speed=2;gap=220;}
+ if(d==="normal"){speed=3;gap=180;}
+ if(d==="hard"){speed=5;gap=140;}
+ document.getElementById("menu").style.display="none";
+ restart();
+}
+
+function restart(){
+ bird={x:150,y:250,vy:0};
+ obstacles=[];coins=[];score=0;donuts=0;
+ document.getElementById("gameOver").style.display="none";
+ gameRunning=true;
+}
+
+function spawnObstacle(){
+ let topH=Math.random()*(canvas.height-350)+50;
+ let names=["STA","EMIR","BLOCK OWNER"];
+ obstacles.push({
+   x:canvas.width,
+   top:topH,
+   bottom:topH+gap,
+   name:names[Math.floor(Math.random()*names.length)],
+   passed:false
+ });
+ if(Math.random()<0.7){
+   coins.push({x:canvas.width+100,y:topH+gap/2});
+ }
+}
+
+setInterval(()=>{if(gameRunning)spawnObstacle();},1800);
+
+function jump(){if(gameRunning)bird.vy=-9;}
+addEventListener("keydown",e=>{
+ if(e.code==="Space") jump();
+});
+addEventListener("mousedown",jump);
+addEventListener("touchstart",jump);
+
+function drawSea(){
+ ctx.fillStyle="#157bd1";
+ ctx.fillRect(0,canvas.height-120,canvas.width,120);
+
+ ctx.fillStyle="#3ba55c";
+ ctx.beginPath();
+ ctx.ellipse(180,canvas.height-130,90,40,0,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="white";
+ ctx.fillText("Hanguar",145,canvas.height-125);
+ ctx.fillText("Taor",20,canvas.height-20);
+}
+
+function update(){
+ if(!gameRunning) return;
+
+ bird.vy+=0.5;
+ bird.y+=bird.vy;
+
+ if(bird.y<0||bird.y>canvas.height-120){
+   gameOver();
+ }
+
+ for(let o of obstacles){
+   o.x-=speed;
+
+   if(!o.passed && o.x+70<bird.x){
+      score++;
+      o.passed=true;
+   }
+
+   if(
+      bird.x+40>o.x &&
+      bird.x<o.x+70 &&
+      (bird.y<o.top || bird.y+40>o.bottom)
+   ){
+      gameOver();
+   }
+ }
+
+ for(let c of coins){
+   c.x-=speed;
+
+   let dx=(bird.x+20)-c.x;
+   let dy=(bird.y+20)-c.y;
+
+   if(Math.sqrt(dx*dx+dy*dy)<30){
+      donuts++;
+      score+=5;
+      c.hit=true;
+   }
+ }
+
+ obstacles=obstacles.filter(o=>o.x>-100);
+ coins=coins.filter(c=>c.x>-50 && !c.hit);
+
+ document.getElementById("score").textContent=score;
+ document.getElementById("donuts").textContent=donuts;
+}
+
+function draw(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ let grad=ctx.createLinearGradient(0,0,0,canvas.height);
+ grad.addColorStop(0,"#87ceeb");
+ grad.addColorStop(1,"#dff5ff");
+ ctx.fillStyle=grad;
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ for(let o of obstacles){
+   ctx.fillStyle="#c62828";
+   ctx.fillRect(o.x,0,70,o.top);
+   ctx.fillRect(o.x,o.bottom,70,canvas.height-o.bottom-120);
+
+   ctx.fillStyle="white";
+   ctx.fillText(o.name,o.x+5,o.top+20);
+ }
+
+ for(let c of coins){
+   ctx.fillStyle="pink";
+   ctx.beginPath();
+   ctx.arc(c.x,c.y,15,0,Math.PI*2);
+   ctx.fill();
+   ctx.fillStyle="#fff";
+   ctx.fillText("🍩",c.x-8,c.y+5);
+ }
+
+ ctx.fillStyle="gold";
+ ctx.fillRect(bird.x,bird.y,40,40);
+ ctx.fillStyle="#000";
+ ctx.fillText(document.getElementById("char").value==="1"?"R":"K",bird.x+13,bird.y+25);
+
+ drawSea();
+}
+
+function gameOver(){
+ gameRunning=false;
+ localStorage.raiyathHigh=Math.max(score, +(localStorage.raiyathHigh||0));
+ document.getElementById("finalScore").innerHTML=
+ "Score: "+score+"<br>Donuts: "+donuts+"<br>High Score: "+localStorage.raiyathHigh;
+ document.getElementById("gameOver").style.display="flex";
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
